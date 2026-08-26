@@ -1,0 +1,36 @@
+name: Security & Vulnerability Scan
+
+on:
+  schedule:
+    - cron: '0 4 * * 1' # Run weekly on Mondays at 04:00 UTC
+  workflow_dispatch:
+
+jobs:
+  trivy-scan:
+    name: Trivy Container Vulnerability Scan
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Build local container image for scanning
+        run: |
+          docker build -t hishtory-server:scan .
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: 'hishtory-server:scan'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          severity: 'CRITICAL,HIGH'
+
+      - name: Upload Trivy scan results to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: 'trivy-results.sarif'

@@ -1,0 +1,31 @@
+# ==============================================================================
+# hiSHtory Self-Hosted Stack - SQLite (Default Production)
+# ==============================================================================
+services:
+  hishtory:
+    image: ghcr.io/${GH_IMAGE:-ddworken/hishtory-server}:latest
+    # Alternatively build locally:
+    # build:
+    #   context: ..
+    #   dockerfile: Dockerfile
+    container_name: hishtory-server
+    restart: unless-stopped
+    ports:
+      - "${PORT:-8080}:8080"
+    environment:
+      - PUID=${PUID:-1000}
+      - PGID=${PGID:-1000}
+      - TZ=${TZ:-UTC}
+      - MODE=${MODE:-all}
+      - HISHTORY_SECRET_KEY=${HISHTORY_SECRET_KEY:-}
+      - WEB_USER=${WEB_USER:-admin}
+      - WEB_PASSWORD=${WEB_PASSWORD:-}
+      - WEB_PASSWORD_HASH=${WEB_PASSWORD_HASH:-}
+    volumes:
+      - ./config:/config
+    healthcheck:
+      test: ["CMD", "/healthcheck.sh"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
