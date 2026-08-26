@@ -1,0 +1,12 @@
+.git
+.github
+.gitignore
+.dockerignore
+compose/
+scripts/
+tests/
+*.md
+*.pyc
+__pycache__/
+.env*
+!root/

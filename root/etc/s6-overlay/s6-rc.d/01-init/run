@@ -1,0 +1,121 @@
+#!/usr/bin/with-contenv bash
+# ==============================================================================
+# S6-Overlay Initialization Script (01-init)
+# Handles secrets resolution, LinuxServer permissions, Web UI auth, and token init
+# ==============================================================================
+
+set -e
+
+echo "[hishtory-init] Initializing self-hosted hiSHtory container..."
+
+# ------------------------------------------------------------------------------
+# Helper: Resolve environment variables or Docker secret files
+# Priority: 1. <VAR>_FILE, 2. /run/secrets/<var_lower> or /run/secrets/<VAR>, 3. $<VAR>
+# ------------------------------------------------------------------------------
+resolve_secret() {
+    local var_name="$1"
+    local default_val="$2"
+    local file_var_name="${var_name}_FILE"
+    local file_path="${!file_var_name}"
+    local var_lower
+    var_lower=$(echo "$var_name" | tr '[:upper:]' '[:lower:]')
+
+    if [ -n "$file_path" ] && [ -f "$file_path" ]; then
+        head -n 1 "$file_path" | tr -d '\r\n'
+    elif [ -f "/run/secrets/${var_name}" ]; then
+        head -n 1 "/run/secrets/${var_name}" | tr -d '\r\n'
+    elif [ -f "/run/secrets/${var_lower}" ]; then
+        head -n 1 "/run/secrets/${var_lower}" | tr -d '\r\n'
+    elif [ -n "${!var_name}" ]; then
+        echo "${!var_name}"
+    else
+        echo "$default_val"
+    fi
+}
+
+# ------------------------------------------------------------------------------
+# Resolve Configuration Parameters & Secrets
+# ------------------------------------------------------------------------------
+MODE=$(resolve_secret "MODE" "all")
+PUID=$(resolve_secret "PUID" "1000")
+PGID=$(resolve_secret "PGID" "1000")
+PORT=$(resolve_secret "PORT" "8080")
+
+HISHTORY_SECRET_KEY=$(resolve_secret "HISHTORY_SECRET_KEY" "")
+HISHTORY_POSTGRES_DB=$(resolve_secret "HISHTORY_POSTGRES_DB" "")
+HISHTORY_SQLITE_DB=$(resolve_secret "HISHTORY_SQLITE_DB" "/config/hishtory.db")
+
+WEB_USER=$(resolve_secret "WEB_USER" "admin")
+WEB_PASSWORD=$(resolve_secret "WEB_PASSWORD" "")
+WEB_PASSWORD_HASH=$(resolve_secret "WEB_PASSWORD_HASH" "")
+if [ -z "$WEB_PASSWORD_HASH" ]; then
+    WEB_PASSWORD_HASH=$(resolve_secret "WEB_AUTH_HASH" "")
+fi
+
+# ------------------------------------------------------------------------------
+# Directory Creation & LinuxServer Permissions
+# ------------------------------------------------------------------------------
+mkdir -p /config/nginx /config/client /config/data /run/nginx /run/hishtory
+
+# ------------------------------------------------------------------------------
+# Web UI Basic Authentication Setup (.htpasswd)
+# ------------------------------------------------------------------------------
+HTPASSWD_FILE="/config/nginx/.htpasswd"
+
+if [ -n "$WEB_PASSWORD_HASH" ]; then
+    echo "[hishtory-init] Using pre-hashed credentials for Web UI user: '${WEB_USER}'"
+    echo "${WEB_USER}:${WEB_PASSWORD_HASH}" > "$HTPASSWD_FILE"
+elif [ -n "$WEB_PASSWORD" ]; then
+    echo "[hishtory-init] Generating bcrypt htpasswd for Web UI user: '${WEB_USER}'"
+    htpasswd -b -B -c "$HTPASSWD_FILE" "$WEB_USER" "$WEB_PASSWORD"
+elif [ ! -f "$HTPASSWD_FILE" ]; then
+    # Generate a random secure password if none provided
+    RANDOM_PASS=$(head -c 32 /dev/urandom | base64 | tr -dc 'a-zA-Z0-9' | head -c 16)
+    echo "================================================================================"
+    echo "[hishtory-init] [SECURITY NOTICE] No WEB_PASSWORD or WEB_PASSWORD_HASH configured."
+    echo "[hishtory-init] Generated temporary Web UI credentials:"
+    echo "[hishtory-init]   Username: ${WEB_USER}"
+    echo "[hishtory-init]   Password: ${RANDOM_PASS}"
+    echo "[hishtory-init] Please configure WEB_PASSWORD or WEB_PASSWORD_HASH in production!"
+    echo "================================================================================"
+    htpasswd -b -B -c "$HTPASSWD_FILE" "$WEB_USER" "$RANDOM_PASS"
+fi
+chmod 600 "$HTPASSWD_FILE"
+
+# ------------------------------------------------------------------------------
+# Single-User Client Initialization & Token Linking
+# ------------------------------------------------------------------------------
+export HOME="/config/client"
+export HISHTORY_SERVER="http://127.0.0.1:8081"
+
+if [ -n "$HISHTORY_SECRET_KEY" ]; then
+    if [ ! -f "/config/client/.hishtory/config.json" ] && [ ! -d "/config/client/.hishtory" ]; then
+        echo "[hishtory-init] Initializing local hishtory client with user token..."
+        hishtory init "$HISHTORY_SECRET_KEY" || echo "[hishtory-init] Note: hishtory init completed or deferred until server start."
+    else
+        echo "[hishtory-init] hishtory client configuration exists in /config/client."
+    fi
+else
+    echo "[hishtory-init] [INFO] HISHTORY_SECRET_KEY not set. Local Web UI will initialize on first client connection or pairing."
+fi
+
+# ------------------------------------------------------------------------------
+# Export Runtime Environment for S6 Longrun Services
+# ------------------------------------------------------------------------------
+cat <<EOF > /run/hishtory/runtime.env
+MODE=${MODE}
+PORT=${PORT}
+HISHTORY_POSTGRES_DB=${HISHTORY_POSTGRES_DB}
+HISHTORY_SQLITE_DB=${HISHTORY_SQLITE_DB}
+HISHTORY_SECRET_KEY=${HISHTORY_SECRET_KEY}
+HISHTORY_SERVER=${HISHTORY_SERVER}
+HOME=/config/client
+PUID=${PUID}
+PGID=${PGID}
+EOF
+
+# Ensure appropriate permissions on persistent /config and /run directories
+chown -R "${PUID}:${PGID}" /config /run/hishtory /run/nginx /var/lib/nginx /var/log/nginx
+
+echo "[hishtory-init] Initialization complete. Mode: ${MODE}, Public Port: ${PORT}."
+exit 0

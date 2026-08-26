@@ -1,0 +1,45 @@
+#!/usr/bin/with-contenv bash
+# ==============================================================================
+# S6-Overlay Service: hishtory Web Server / UI
+# Listens on internal port 127.0.0.1:8000
+# ==============================================================================
+
+if [ -f /run/hishtory/runtime.env ]; then
+    # shellcheck disable=SC1091
+    source /run/hishtory/runtime.env
+fi
+
+if [ "$MODE" = "ingress" ]; then
+    echo "[svc-web] Web UI disabled (MODE=ingress). Service idle."
+    exec s6-pause
+fi
+
+echo "[svc-web] Preparing hiSHtory Web UI Server..."
+
+export HOME="/config/client"
+export HISHTORY_SERVER="http://127.0.0.1:8081"
+
+# Wait briefly for internal Ingress Server to be online
+if [ "$MODE" = "all" ]; then
+    echo "[svc-web] Waiting for internal Ingress API (127.0.0.1:8081) to become healthy..."
+    for i in $(seq 1 30); do
+        if curl -s -f "http://127.0.0.1:8081/healthcheck" >/dev/null 2>&1; then
+            echo "[svc-web] Internal Ingress API is responsive."
+            break
+        fi
+        sleep 1
+    done
+fi
+
+# Ensure hishtory client is initialized with secret key if set
+if [ -n "$HISHTORY_SECRET_KEY" ]; then
+    if [ ! -d "/config/client/.hishtory" ]; then
+        echo "[svc-web] Initializing hishtory client with token..."
+        s6-setuidgid "${PUID:-1000}:${PGID:-1000}" env HOME=/config/client HISHTORY_SERVER="http://127.0.0.1:8081" /usr/local/bin/hishtory init "$HISHTORY_SECRET_KEY" || true
+    fi
+fi
+
+echo "[svc-web] Starting hiSHtory Web UI on internal port 127.0.0.1:8000..."
+
+# Execute hishtory start-web-ui daemon
+exec s6-setuidgid "${PUID:-1000}:${PGID:-1000}" env HOME=/config/client HISHTORY_SERVER="http://127.0.0.1:8081" /usr/local/bin/hishtory start-web-ui

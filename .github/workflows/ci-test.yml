@@ -1,0 +1,81 @@
+name: CI - Lint, Build & Smoke Test
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches-ignore:
+      - main
+
+jobs:
+  lint-and-validate:
+    name: Lint Dockerfile & Validate Compose
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run Hadolint on Dockerfile
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: Dockerfile
+          ignore: DL3018,DL3008
+
+      - name: Validate Docker Compose Syntaxes
+        run: |
+          docker compose -f compose/docker-compose.yml config
+          docker compose -f compose/docker-compose.postgres.yml config
+
+  build-and-test:
+    name: Build & Smoke Test Container
+    runs-on: ubuntu-latest
+    needs: lint-and-validate
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build local container image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          load: true
+          tags: hishtory-server:test
+
+      - name: Set up Python for Test Suite
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install test dependencies
+        run: pip install pytest requests
+
+      - name: Start Test Container
+        run: |
+          docker run -d \
+            --name hishtory-ci-test \
+            -p 8080:8080 \
+            -e MODE=all \
+            -e WEB_USER=testadmin \
+            -e WEB_PASSWORD=testsecretpass \
+            hishtory-server:test
+
+      - name: Run Python Smoke & Integration Tests
+        run: |
+          pytest tests/smoke_test.py -v
+
+      - name: Test Docker Secrets Handling
+        run: |
+          bash tests/test_secrets.sh
+
+      - name: Cleanup Container
+        if: always()
+        run: |
+          docker logs hishtory-ci-test || true
+          docker rm -f hishtory-ci-test || true

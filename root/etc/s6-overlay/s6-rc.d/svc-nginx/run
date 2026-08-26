@@ -1,0 +1,21 @@
+#!/usr/bin/with-contenv bash
+# ==============================================================================
+# S6-Overlay Service: Nginx Reverse Proxy
+# Listens on public container port (default 8080)
+# ==============================================================================
+
+if [ -f /run/hishtory/runtime.env ]; then
+    # shellcheck disable=SC1091
+    source /run/hishtory/runtime.env
+fi
+
+echo "[svc-nginx] Starting Nginx reverse proxy on port ${PORT:-8080}..."
+
+# Ensure log and pid directories exist
+mkdir -p /var/log/nginx /var/lib/nginx/tmp /run/nginx
+
+# Test nginx config syntax
+nginx -t -c /etc/nginx/nginx.conf
+
+# Execute Nginx daemon
+exec nginx -c /etc/nginx/nginx.conf -g "daemon off;"

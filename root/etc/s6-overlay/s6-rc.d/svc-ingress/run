@@ -1,0 +1,32 @@
+#!/usr/bin/with-contenv bash
+# ==============================================================================
+# S6-Overlay Service: hishtory-server (Ingress API)
+# Listens on internal port 127.0.0.1:8081
+# ==============================================================================
+
+if [ -f /run/hishtory/runtime.env ]; then
+    # shellcheck disable=SC1091
+    source /run/hishtory/runtime.env
+fi
+
+if [ "$MODE" = "web" ]; then
+    echo "[svc-ingress] Ingress server disabled (MODE=web). Service idle."
+    exec s6-pause
+fi
+
+echo "[svc-ingress] Starting hiSHtory Ingress Server on 127.0.0.1:8081..."
+
+# Configure database
+if [ -n "$HISHTORY_POSTGRES_DB" ]; then
+    echo "[svc-ingress] Using PostgreSQL database backend."
+    export HISHTORY_POSTGRES_DB
+else
+    echo "[svc-ingress] Using SQLite database backend at: ${HISHTORY_SQLITE_DB:-/config/hishtory.db}"
+    export HISHTORY_SQLITE_DB="${HISHTORY_SQLITE_DB:-/config/hishtory.db}"
+fi
+
+export PORT=8081
+export HISHTORY_SERVER_INTERNAL="127.0.0.1:8081"
+
+# Execute hishtory-server daemon with PUID:PGID permissions
+exec s6-setuidgid "${PUID:-1000}:${PGID:-1000}" /usr/local/bin/hishtory-server
