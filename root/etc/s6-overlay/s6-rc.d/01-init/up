@@ -1,2 +1,0 @@
-#!/command/execlineb -P
-/bin/bash /etc/s6-overlay/s6-rc.d/01-init/run

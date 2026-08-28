@@ -1,7 +1,7 @@
-#!/usr/bin/env bash
+#!/usr/bin/with-contenv bash
 # ==============================================================================
-# S6-Overlay Initialization Script (01-init)
-# Handles secrets resolution, LinuxServer permissions, Web UI auth, and token init
+# LinuxServer.io Container Initialization Script (01-init.sh)
+# Handles secrets resolution, LinuxServer permissions, Web UI auth, and runtime env
 # ==============================================================================
 
 set -e
@@ -10,7 +10,7 @@ echo "[hishtory-init] Initializing self-hosted hiSHtory container..."
 
 # ------------------------------------------------------------------------------
 # Helper: Resolve environment variables or Docker secret files
-# Priority: 1. <VAR>_FILE, 2. /run/secrets/<var_lower> or /run/secrets/<VAR>, 3. $<VAR>
+# Priority: 1. <VAR>_FILE, 2. $<VAR>, 3. /run/secrets/
 # ------------------------------------------------------------------------------
 resolve_secret() {
     local var_name="$1"
@@ -22,12 +22,12 @@ resolve_secret() {
 
     if [ -n "$file_path" ] && [ -f "$file_path" ]; then
         head -n 1 "$file_path" | tr -d '\r\n'
+    elif [ -n "${!var_name}" ]; then
+        echo "${!var_name}"
     elif [ -f "/run/secrets/${var_name}" ]; then
         head -n 1 "/run/secrets/${var_name}" | tr -d '\r\n'
     elif [ -f "/run/secrets/${var_lower}" ]; then
         head -n 1 "/run/secrets/${var_lower}" | tr -d '\r\n'
-    elif [ -n "${!var_name}" ]; then
-        echo "${!var_name}"
     else
         echo "$default_val"
     fi
@@ -58,12 +58,12 @@ fi
 mkdir -p /config/nginx /config/client /config/data /run/nginx /run/hishtory
 
 # ------------------------------------------------------------------------------
-# Web UI Basic Authentication Setup (.htpasswd)
+# Web UI Basic Authentication Setup (htpasswd)
 # ------------------------------------------------------------------------------
-HTPASSWD_FILE="/config/nginx/.htpasswd"
+HTPASSWD_FILE="/config/nginx/htpasswd"
 
 if [ -n "$WEB_PASSWORD_HASH" ]; then
-    echo "[hishtory-init] Using pre-hashed credentials for Web UI user: '${WEB_USER}'"
+    echo "[hishtory-init] Using configured password hash for Web UI user: '${WEB_USER}'"
     echo "${WEB_USER}:${WEB_PASSWORD_HASH}" > "$HTPASSWD_FILE"
 elif [ -n "$WEB_PASSWORD" ]; then
     echo "[hishtory-init] Generating bcrypt htpasswd for Web UI user: '${WEB_USER}'"
@@ -83,7 +83,7 @@ fi
 chmod 600 "$HTPASSWD_FILE"
 
 # ------------------------------------------------------------------------------
-# Single-User Client Initialization & Token Linking
+# Single-User Client Initialization & Token Linking Info
 # ------------------------------------------------------------------------------
 export HOME="/config/client"
 export HISHTORY_SERVER="http://127.0.0.1:8081"

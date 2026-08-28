@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/usr/bin/with-contenv bash
 # ==============================================================================
 # S6-Overlay Service: hishtory Web Server / UI
 # Listens on internal port 127.0.0.1:8000
@@ -37,7 +37,8 @@ if [ -n "$HISHTORY_SECRET_KEY" ]; then
         echo "[svc-web] Initializing hishtory client with secret key..."
         if ! s6-setuidgid "${PUID:-1000}:${PGID:-1000}" env HOME=/config/client HISHTORY_SERVER="http://127.0.0.1:8081" /usr/local/bin/hishtory init --force "$HISHTORY_SECRET_KEY"; then
             echo "[svc-web] Retrying hishtory init without --force..."
-            s6-setuidgid "${PUID:-1000}:${PGID:-1000}" env HOME=/config/client HISHTORY_SERVER="http://127.0.0.1:8081" /usr/local/bin/hishtory init "$HISHTORY_SECRET_KEY" || echo "[svc-web] [ERROR] hishtory init failed."
+            s6-setuidgid "${PUID:-1000}:${PGID:-1000}" env HOME=/config/client HISHTORY_SERVER="http://127.0.0.1:8081" /usr/local/bin/hishtory init "$HISHTORY_SECRET_KEY" \
+                || echo "[svc-web] [ERROR] hishtory init failed."
         fi
     fi
 fi
@@ -58,4 +59,5 @@ fi
 echo "[svc-web] Starting hiSHtory Web UI on internal port 127.0.0.1:8000..."
 
 # Execute hishtory start-web-ui daemon on internal port 8000
-exec s6-setuidgid "${PUID:-1000}:${PGID:-1000}" env HOME=/config/client HISHTORY_SERVER="http://127.0.0.1:8081" /usr/local/bin/hishtory start-web-ui --port 8000
+exec s6-setuidgid "${PUID:-1000}:${PGID:-1000}" env HOME=/config/client HISHTORY_SERVER="http://127.0.0.1:8081" \
+    /usr/local/bin/hishtory start-web-ui --disable-auth --port 8000

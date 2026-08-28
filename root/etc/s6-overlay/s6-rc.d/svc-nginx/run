@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/usr/bin/with-contenv bash
 # ==============================================================================
 # S6-Overlay Service: Nginx Reverse Proxy
 # Listens on public container port (default 8080)
