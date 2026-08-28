@@ -1,4 +1,4 @@
-#!/usr/bin/with-contenv bash
+#!/usr/bin/env bash
 # ==============================================================================
 # S6-Overlay Service: hishtory-server (Ingress API)
 # Listens on internal port 127.0.0.1:8081

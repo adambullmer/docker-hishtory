@@ -70,7 +70,9 @@ RUN chmod +x /usr/local/bin/hishtory-server /usr/local/bin/hishtory
 COPY root/ /
 
 # Make scripts executable
-RUN chmod +x /healthcheck.sh /etc/s6-overlay/s6-rc.d/01-init/run \
+RUN chmod +x /healthcheck.sh \
+    /etc/s6-overlay/s6-rc.d/01-init/up \
+    /etc/s6-overlay/s6-rc.d/01-init/run \
     /etc/s6-overlay/s6-rc.d/svc-ingress/run \
     /etc/s6-overlay/s6-rc.d/svc-web/run \
     /etc/s6-overlay/s6-rc.d/svc-nginx/run

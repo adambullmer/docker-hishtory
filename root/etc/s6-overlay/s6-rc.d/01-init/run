@@ -1,4 +1,4 @@
-#!/usr/bin/with-contenv bash
+#!/usr/bin/env bash
 # ==============================================================================
 # S6-Overlay Initialization Script (01-init)
 # Handles secrets resolution, LinuxServer permissions, Web UI auth, and token init
