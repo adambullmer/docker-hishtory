@@ -41,5 +41,5 @@ fi
 
 echo "[svc-web] Starting hiSHtory Web UI on internal port 127.0.0.1:8000..."
 
-# Execute hishtory start-web-ui daemon
-exec s6-setuidgid "${PUID:-1000}:${PGID:-1000}" env HOME=/config/client HISHTORY_SERVER="http://127.0.0.1:8081" /usr/local/bin/hishtory start-web-ui
+# Execute hishtory start-web-ui daemon on internal port 8000
+exec s6-setuidgid "${PUID:-1000}:${PGID:-1000}" env HOME=/config/client HISHTORY_SERVER="http://127.0.0.1:8081" /usr/local/bin/hishtory start-web-ui --port 8000

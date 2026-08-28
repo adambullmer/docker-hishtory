@@ -25,6 +25,7 @@ else
     export HISHTORY_SQLITE_DB="${HISHTORY_SQLITE_DB:-/config/hishtory.db}"
 fi
 
+export HISHTORY_SERVER_PORT=8081
 export PORT=8081
 export HISHTORY_SERVER_INTERNAL="127.0.0.1:8081"
 
