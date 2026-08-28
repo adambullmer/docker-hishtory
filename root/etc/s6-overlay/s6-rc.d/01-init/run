@@ -90,13 +90,12 @@ export HISHTORY_SERVER="http://127.0.0.1:8081"
 
 if [ -n "$HISHTORY_SECRET_KEY" ]; then
     if [ ! -f "/config/client/.hishtory/config.json" ] && [ ! -d "/config/client/.hishtory" ]; then
-        echo "[hishtory-init] Initializing local hishtory client with user token..."
-        hishtory init "$HISHTORY_SECRET_KEY" || echo "[hishtory-init] Note: hishtory init completed or deferred until server start."
+        echo "[hishtory-init] HISHTORY_SECRET_KEY configured; client setup will initialize when Ingress server is ready."
     else
         echo "[hishtory-init] hishtory client configuration exists in /config/client."
     fi
 else
-    echo "[hishtory-init] [INFO] HISHTORY_SECRET_KEY not set. Local Web UI will initialize on first client connection or pairing."
+    echo "[hishtory-init] [INFO] HISHTORY_SECRET_KEY not set. Web UI will idle; backend Ingress sync API is fully operational."
 fi
 
 # ------------------------------------------------------------------------------

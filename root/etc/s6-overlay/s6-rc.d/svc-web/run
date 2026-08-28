@@ -21,9 +21,9 @@ export HISHTORY_SERVER="http://127.0.0.1:8081"
 
 # Wait briefly for internal Ingress Server to be online
 if [ "$MODE" = "all" ]; then
-    echo "[svc-web] Waiting for internal Ingress API (127.0.0.1:8081) to become healthy..."
+    echo "[svc-web] Waiting for internal Ingress API (127.0.0.1:8081) to become responsive..."
     for i in $(seq 1 30); do
-        if curl -s -f "http://127.0.0.1:8081/healthcheck" >/dev/null 2>&1; then
+        if nc -z 127.0.0.1 8081 2>/dev/null || curl -s "http://127.0.0.1:8081/healthcheck" >/dev/null 2>&1; then
             echo "[svc-web] Internal Ingress API is responsive."
             break
         fi
@@ -34,9 +34,25 @@ fi
 # Ensure hishtory client is initialized with secret key if set
 if [ -n "$HISHTORY_SECRET_KEY" ]; then
     if [ ! -d "/config/client/.hishtory" ]; then
-        echo "[svc-web] Initializing hishtory client with token..."
-        s6-setuidgid "${PUID:-1000}:${PGID:-1000}" env HOME=/config/client HISHTORY_SERVER="http://127.0.0.1:8081" /usr/local/bin/hishtory init "$HISHTORY_SECRET_KEY" || true
+        echo "[svc-web] Initializing hishtory client with secret key..."
+        if ! s6-setuidgid "${PUID:-1000}:${PGID:-1000}" env HOME=/config/client HISHTORY_SERVER="http://127.0.0.1:8081" /usr/local/bin/hishtory init --force "$HISHTORY_SECRET_KEY"; then
+            echo "[svc-web] Retrying hishtory init without --force..."
+            s6-setuidgid "${PUID:-1000}:${PGID:-1000}" env HOME=/config/client HISHTORY_SERVER="http://127.0.0.1:8081" /usr/local/bin/hishtory init "$HISHTORY_SECRET_KEY" || echo "[svc-web] [ERROR] hishtory init failed."
+        fi
     fi
+fi
+
+# Check if client configuration exists
+if [ ! -d "/config/client/.hishtory" ]; then
+    echo "================================================================================"
+    echo "[svc-web] [NOTICE] No hishtory client configuration found at /config/client/.hishtory."
+    echo "[svc-web] [NOTICE] The hiSHtory Web UI requires a decrypted client profile."
+    echo "[svc-web] [NOTICE] • If you only need the sync backend: set MODE=ingress"
+    echo "[svc-web] [NOTICE] • If you want the Web UI: set HISHTORY_SECRET_KEY=<your_key> in .env"
+    echo "[svc-web] [NOTICE]   (Get your key by running 'hishtory status' on any registered device)"
+    echo "[svc-web] [NOTICE] Service is idling. Ingress sync API is active and healthy."
+    echo "================================================================================"
+    exec s6-pause
 fi
 
 echo "[svc-web] Starting hiSHtory Web UI on internal port 127.0.0.1:8000..."
