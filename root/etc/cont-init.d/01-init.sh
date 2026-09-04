@@ -52,6 +52,15 @@ if [ -z "$WEB_PASSWORD_HASH" ]; then
     WEB_PASSWORD_HASH=$(resolve_secret "WEB_AUTH_HASH" "")
 fi
 
+THEME=$(resolve_secret "THEME" "")
+if [ -z "$THEME" ]; then
+    THEME=$(resolve_secret "WEB_THEME" "")
+fi
+if [ -z "$THEME" ]; then
+    THEME=$(resolve_secret "HISHTORY_THEME" "")
+fi
+THEME=$(echo "$THEME" | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]')
+
 # ------------------------------------------------------------------------------
 # Directory Creation & LinuxServer Permissions
 # ------------------------------------------------------------------------------
@@ -81,6 +90,66 @@ elif [ ! -f "$HTPASSWD_FILE" ]; then
     htpasswd -b -B -c "$HTPASSWD_FILE" "$WEB_USER" "$RANDOM_PASS"
 fi
 chmod 600 "$HTPASSWD_FILE"
+
+# ------------------------------------------------------------------------------
+# Web UI Theme Resolution & Dynamic Nginx Configuration
+# Priority:
+#   1. Conventional /config/theme.css if it exists
+#   2. Built-in theme by name in /usr/share/hishtory/themes/${THEME}.css if set
+#   3. Otherwise, theme injection disabled
+# ------------------------------------------------------------------------------
+CONVENTIONAL_THEME="/config/theme.css"
+BUILTIN_THEMES_DIR="/usr/share/hishtory/themes"
+THEME_CONF="/etc/nginx/conf.d/theme.conf"
+mkdir -p /etc/nginx/conf.d
+
+ACTIVE_THEME_FILE=""
+
+if [ -f "$CONVENTIONAL_THEME" ]; then
+    ACTIVE_THEME_FILE="$CONVENTIONAL_THEME"
+    echo "[hishtory-init] Using custom theme from conventional location: ${CONVENTIONAL_THEME}"
+    if [ -n "$THEME" ]; then
+        echo "[hishtory-init] [NOTE] THEME='${THEME}' ignored because custom ${CONVENTIONAL_THEME} is present."
+    fi
+elif [ -n "$THEME" ]; then
+    BUILTIN_SOURCE="${BUILTIN_THEMES_DIR}/${THEME}.css"
+    if [ -f "$BUILTIN_SOURCE" ]; then
+        ACTIVE_THEME_FILE="$BUILTIN_SOURCE"
+        echo "[hishtory-init] Using built-in theme: ${THEME} (${BUILTIN_SOURCE})"
+    else
+        echo "[hishtory-init] [WARNING] Requested theme '${THEME}' not found in ${BUILTIN_THEMES_DIR}."
+        echo "[hishtory-init] Available themes: $(ls -1 "$BUILTIN_THEMES_DIR" 2>/dev/null | sed 's/\.css$//' | tr '\n' ' ')"
+    fi
+fi
+
+if [ -n "$ACTIVE_THEME_FILE" ]; then
+    echo "[hishtory-init] Enabling Nginx theme injection pointing to ${ACTIVE_THEME_FILE}"
+    cat <<EOF > "$THEME_CONF"
+# Serves the active theme CSS file
+location = /theme.css {
+    alias ${ACTIVE_THEME_FILE};
+    default_type text/css;
+    add_header Content-Type text/css;
+    add_header Cache-Control "no-cache, must-revalidate";
+}
+
+# Subrequest endpoint returning the theme link tag
+location = /_theme_tag {
+    internal;
+    default_type text/html;
+    return 200 '<link rel="stylesheet" type="text/css" href="/theme.css">\\n';
+}
+EOF
+else
+    echo "[hishtory-init] No theme configured. Theme injection disabled."
+    cat <<'EOF' > "$THEME_CONF"
+# Theme injection disabled (no active theme)
+location = /_theme_tag {
+    internal;
+    return 204;
+}
+EOF
+fi
 
 # ------------------------------------------------------------------------------
 # Single-User Client Initialization & Token Linking Info

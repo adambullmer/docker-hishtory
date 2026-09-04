@@ -193,8 +193,51 @@ WEB_PASSWORD_HASH=$2y$12$e8d...
 | `WEB_USER` | `admin` | Username for Web UI Basic Auth |
 | `WEB_PASSWORD` | *(auto-generated)* | Plaintext password for Web UI (automatically hashed to bcrypt) |
 | `WEB_PASSWORD_HASH` | *(empty)* | Pre-computed bcrypt/SHA hash for Web UI (bypasses plaintext) |
+| `THEME` | *(empty)* | Built-in theme name (`lime`, `amber`, `blue`, `cyan`, etc.) with auto Light/Dark mode |
 | `HISHTORY_SQLITE_DB` | `/config/hishtory.db` | Path to SQLite database file |
 | `HISHTORY_POSTGRES_DB` | *(empty)* | PostgreSQL connection URI (`postgresql://user:pass@host:5432/db`) |
+
+---
+
+## Web UI Theming & Customization
+
+The hiSHtory Web UI uses Bootstrap 5.3.2. This container supports comprehensive styling customizations via Bootstrap CSS variable overrides injected seamlessly via Nginx into the root HTML page.
+
+### Automatic Light & Dark Mode
+All themes adapt automatically to your operating system's color scheme (`light` or `dark`) with zero JavaScript overhead using CSS media queries (`@media (prefers-color-scheme: dark)`).
+
+### Built-in Themes (Ported from shadcn/ui)
+You can choose from 22 pre-configured themes ported from the official **shadcn/ui** palette:
+
+| Category | Available Themes |
+| :--- | :--- |
+| **Vibrant Colors** | `lime`, `amber`, `blue`, `cyan`, `emerald`, `fuchsia`, `green`, `indigo`, `orange`, `pink`, `purple`, `red`, `rose`, `sky`, `teal`, `violet`, `yellow` |
+| **Neutral Bases** | `zinc`, `slate`, `stone`, `gray`, `neutral` |
+
+To enable a built-in theme, set the `THEME` environment variable:
+```yaml
+services:
+  hishtory:
+    image: ghcr.io/your-org/hishtory-server:latest
+    environment:
+      - THEME=lime
+```
+
+### Providing a Custom Theme
+You can provide your own theme stylesheet by mounting a CSS file to the conventional location `/config/theme.css`:
+
+```yaml
+services:
+  hishtory:
+    image: ghcr.io/your-org/hishtory-server:latest
+    volumes:
+      - ./my-custom-theme.css:/config/theme.css:ro
+```
+
+- **Priority Resolution**:
+  1. If `/config/theme.css` exists, Nginx points `/theme.css` directly to your custom file and enables injection.
+  2. If `THEME=<name>` is specified (and no `/config/theme.css` exists), Nginx points `/theme.css` directly to `/usr/share/hishtory/themes/<name>.css` without modifying your `/config` volume.
+  3. If no theme is configured and `/config/theme.css` is absent, theme injection is completely disabled with zero overhead.
 
 ---
 
