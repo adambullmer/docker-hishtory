@@ -1,6 +1,6 @@
 #!/usr/bin/with-contenv bash
 # ==============================================================================
-# LinuxServer.io Container Initialization Script (01-init.sh)
+# S6-Overlay Initialization Service (svc-init: oneshot)
 # Handles secrets resolution, LinuxServer permissions, Web UI auth, and runtime env
 # ==============================================================================
 

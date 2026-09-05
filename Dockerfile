@@ -71,7 +71,7 @@ COPY root/ /
 
 # Make scripts executable
 RUN chmod +x /healthcheck.sh \
-    /etc/cont-init.d/* \
+    /etc/s6-overlay/s6-rc.d/svc-init/up \
     /etc/s6-overlay/s6-rc.d/svc-ingress/run \
     /etc/s6-overlay/s6-rc.d/svc-web/run \
     /etc/s6-overlay/s6-rc.d/svc-nginx/run

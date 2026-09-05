@@ -241,6 +241,36 @@ EOF
             self.assertIn("return 204;", theme_conf)
             self.assertNotIn("alias", theme_conf)
 
+    def test_s6_v3_structure(self):
+        """Verify that s6-overlay v3 native services and dependency tree are properly configured."""
+        s6_rc_dir = os.path.join(REPO_ROOT, "root", "etc", "s6-overlay", "s6-rc.d")
+        cont_init_dir = os.path.join(REPO_ROOT, "root", "etc", "cont-init.d")
+
+        # Ensure legacy cont-init.d is removed
+        self.assertFalse(os.path.exists(cont_init_dir), "Legacy /etc/cont-init.d should not exist")
+
+        # Verify svc-init oneshot service
+        svc_init_dir = os.path.join(s6_rc_dir, "svc-init")
+        self.assertTrue(os.path.isdir(svc_init_dir), "svc-init directory missing")
+        with open(os.path.join(svc_init_dir, "type"), "r") as f:
+            self.assertEqual(f.read().strip(), "oneshot")
+        up_script = os.path.join(svc_init_dir, "up")
+        self.assertTrue(os.path.isfile(up_script), "svc-init/up script missing")
+        self.assertTrue(os.access(up_script, os.X_OK), "svc-init/up must be executable")
+
+        # Verify user bundle registration
+        user_content = os.path.join(s6_rc_dir, "user", "contents.d", "svc-init")
+        self.assertTrue(os.path.isfile(user_content), "svc-init not registered in user/contents.d")
+
+        # Verify dependent services declare dependency on svc-init
+        for svc in ["svc-nginx", "svc-ingress", "svc-web"]:
+            dep_file = os.path.join(s6_rc_dir, svc, "dependencies")
+            dep_d_file = os.path.join(s6_rc_dir, svc, "dependencies.d", "svc-init")
+            self.assertTrue(os.path.isfile(dep_file), f"{svc}/dependencies missing")
+            with open(dep_file, "r") as f:
+                self.assertIn("svc-init", f.read())
+            self.assertTrue(os.path.isfile(dep_d_file), f"{svc}/dependencies.d/svc-init missing")
+
 
 if __name__ == "__main__":
     unittest.main()
