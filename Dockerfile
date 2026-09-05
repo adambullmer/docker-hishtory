@@ -39,7 +39,7 @@ RUN CGO_ENABLED=1 GOOS=linux go build \
 # ------------------------------------------------------------------------------
 # Runtime Stage: LinuxServer.io Alpine base image with S6-Overlay v3
 # ------------------------------------------------------------------------------
-FROM ghcr.io/linuxserver/baseimage-alpine:3.21
+FROM ghcr.io/linuxserver/baseimage-alpine:3.24
 
 # Container metadata and labels following OCI specification
 LABEL maintainer="hishtory-selfhost"
